@@ -2,7 +2,7 @@ from mlflow import MlflowClient
 import mlflow
 import dotenv
 import os
-import training_code
+from training_code import prepare_data, train_RFmodel, data_val, params
 import pandas as pd
 from generate_data import generate_apple_sales_data_with_promo_adjustment
 
@@ -26,12 +26,21 @@ RUN_NAME = os.getenv("MLFLOW_RUN_NAME")
 ARTIFACT_PATH = os.getenv("MLFLOW_ARTIFACT_PATH")
 data_path = "./data/apple_sales_data.csv"
 
+def main():
+    try:
+        df = pd.read_csv(data_path)
+    except Exception as e:
+        print(f"{e}\nGenerating Data ...")
+        df = generate_apple_sales_data_with_promo_adjustment( base_demand= 1000, n_rows = 5000)
+        df.to_csv(data_path)
+        print("The Data was generated successfully")
+    X_train, X_val, y_train, y_val = prepare_data(df)
+    rf = train_RFmodel(X_train= X_train, y_train= y_train, params = params)
+    metrics = data_val(model= rf, X_val= X_val, y_val= y_val)
+    with mlflow.start_run(run_name=RUN_NAME) as run:
+        mlflow.log_params(params)
+        mlflow.log_metrics(metrics)
+        mlflow.sklearn.log_model(sk_model= rf, input_example= X_val, name= ARTIFACT_PATH)
 
-try:
-    df = pd.read_csv(data_path)
-except Exception as e:
-    print(f"{e}\nGenerating Data ...")
-    df = generate_apple_sales_data_with_promo_adjustment( base_demand= 1000, n_rows = 5000)
-    df.to_csv(data_path)
-    print("The Data was generated successfully")
-
+if __name__ =="__main__":
+    main()
