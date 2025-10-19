@@ -69,11 +69,11 @@ class DataProcessor:
         X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size = self.val_size, random_state= self .random_state)
 
         # Scale features
-        X_train_scaled = self.scaler.fit_transform(X_train)
-        X_val_scaled = self.scaler.fit_transform(X_val)
-        X_test_scaled = self.scaler.fit_transform(X_test)
-
-        self.is_fitted= True
+        if not self.is_fitted:
+            X_train_scaled = self.scaler.fit_transform(X_train)
+            X_val_scaled = self.scaler.fit_transform(X_val)
+            X_test_scaled = self.scaler.fit_transform(X_test)
+            self.is_fitted= True
 
         logger.info(f"Data splits - Train: {X_train_scaled.shape}, Val: {X_val_scaled.shape}, Test: {X_test_scaled.shape}")
 
