@@ -1,0 +1,8 @@
+mlflow[extras]
+hyperopt
+tensorflow
+scikit-learn
+pandas 
+numpy
+
+
