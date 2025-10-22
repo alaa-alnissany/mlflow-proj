@@ -1,28 +1,11 @@
+from prepare_data import DataProcessor
+from model import HyperparameterOptimizer
+
 # Important Libs for clean coding
-from typing import Dict, Tuple, Any, Optional
 import logging
 import warnings
-
-# Basic libs
-import pandas as pd 
-import numpy as np
-import matplotlib.pyplot as plt
-
-# Machine learning Libs
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import StandardScaler
-
-# Deep Learning Libs
-import tensorflow as tf
-from tensorflow import keras
-
-# Additional Deep Learning Libs 
-from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
-
-# MLOPS Libs
-import mlflow
-from mlflow.models import infer_signature
+import dotenv
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -31,9 +14,31 @@ logger = logging.getLogger(__name__)
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore') 
 
+dotenv.load_dotenv()
 
 def main():
-    pass
+    try:
+        DATA_URL = os.getenv("DATA_URL")
+        EXPERIMENT_NAME = os.getenv("EXPERIMENT_NAME")
+        MAX_EVALS = os.getenv("MAX_EVALS")
+        logger.info("Step 1: Preparing data")
+        processor = DataProcessor()
+        data = processor.load_data(DATA_URL)
+        X,y = processor.prepare_features_target(data)
+        processed_data = processor.split_data(X,y)
+
+        # Step 2: Run hyperparameter optimization
+        logger.info("Step 2: Starting hyperparameter optimization")
+        optimizer = HyperparameterOptimizer(processed_data, EXPERIMENT_NAME)
+        results = optimizer.optimize(max_evals=MAX_EVALS)
+        
+        # Step 3: Final evaluation (optional - train best model on full training data)
+        logger.info("Step 3: Optimization completed")
+        logger.info(f"Best parameters: {results['best_params']}")
+        logger.info(f"Best validation RMSE: {results['best_rmse']:.4f}")
+    except Exception as e:
+        logger.error(f"Pipeline failed: {e}")
+        raise
 
 
 if __name__ == "__main__":
