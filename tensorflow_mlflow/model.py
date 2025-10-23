@@ -1,27 +1,19 @@
 # Important Libs for clean coding
-from inspect import signature
-from tkinter import NO
-from typing import Dict, Tuple, Any, Optional
+from typing import Dict, Tuple, Any
 import logging
-import warnings
 
 # Basic libs
-from mlflow.entities import metric
-import pandas as pd 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-
-# Machine learning Libs
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import StandardScaler
 
 # Deep Learning Libs
 import tensorflow as tf
 from tensorflow import keras
 
 # Additional Deep Learning Libs 
-from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
+import optuna
+from optuna import Trial
 
 # MLOPS Libs
 import mlflow
@@ -56,7 +48,7 @@ class WineQualityModel:
         model.add(keras.layers.Dense(1))
 
         # Compile model
-        optimizer = keras.optimizers.adam(learning_rate = learning_rate, momentum = momentum)
+        optimizer = keras.optimizers.Adam(learning_rate = learning_rate, ema_momentum = momentum)
         model.compile(
             optimizer = optimizer,
             loss = "mse",
@@ -108,13 +100,14 @@ class HyperparameterOptimizer:
         self.data = data
         self.experiment_name = experiment_name
         self.best_params = None
-        self.trials = None
+        self.study = None
+        self.best_trial = None
 
         mlflow.set_experiment(experiment_name)
     
     def create_model_and_train(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Create and train model with given hyperparameters"""
-        model = WineQualityModel(input_dim=self.data['X_train'].shape(1))
+        model = WineQualityModel(input_dim= self.data['X_train'].shape[1])
         model.build_model(
             learning_rate = params['learning_rate'],
             momentum = params['momentum'],
@@ -131,7 +124,19 @@ class HyperparameterOptimizer:
         )
         return {**results, 'model':model}
     
-    def objective(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def objective(self, trial: Trial) -> float:
+        """Optuna objective function"""
+        # Define hyperparameter search space
+        params = {
+            'learning_rate': trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True),
+            'momentum': trial.suggest_float('momentum', 0.0, 0.9),
+            'dropout_rate': trial.suggest_float('dropout_rate', 0.1, 0.5),
+            'batch_size': trial.suggest_categorical('batch_size', [32, 64, 128]),
+            'hidden_layers': trial.suggest_categorical('hidden_layers', [(64, 32), (128, 64), (64, 32, 16)]),
+            'epochs': 50,  # Fixed value or you can make it tunable
+            'patience': 10  # Fixed value or you can make it tunable
+        }
+        
         with mlflow.start_run(nested= True):
             mlflow.log_params(params)
             result = self.create_model_and_train(params)
@@ -150,7 +155,9 @@ class HyperparameterOptimizer:
                 signature= signature
             )
             self._log_training_curves(result['history'])
-            return {'loss': result['val_rmse'], 'status': STATUS_OK}
+            # Store trial number in user attributes for reference
+            trial.set_user_attr("mlflow_run_id", mlflow.active_run().info.run_id)
+            return result['val_rmse']
         
     def _log_training_curves(self, history: keras.callbacks.History):
             """Create and log training visualization"""
@@ -176,61 +183,73 @@ class HyperparameterOptimizer:
             mlflow.log_figure(fig, "training_curves.png")
             plt.close()
         
-    def optimize(self, max_evals: int = 15) -> Dict[str,Any]:
+    def optimize(self, n_trials: int = 15) -> Dict[str,Any]:
             """Run hyperparameter optimization"""
-            search_space = {
-                'learning_rate': hp.loguniform('learning_rate',np.log(1e-5),np.log(1e-1)),
-                'momentum': hp.uniform('momentum', 0.0, 0.9),
-                'dropout_rate': hp.uniform('dropout_rate',0.1,0.5),
-                'batch_size': hp.choice('batch_size',[32,64,128]),
-                'hidden_layers': hp.choice('hidden_layers', [(64,32),(128,64),(64,32,16)])
-            }
             logger.info("Starting hyperparameter optimization")
-            logger.info(f"Search space: {search_space.keys()}")
 
             with mlflow.start_run(run_name= "hyperparameter-sweep"):
                 mlflow.log_params(
                     {
                         "optimization_method":"TPE",
-                        "max_evaluations": max_evals,
+                        "max_evaluations": n_trials,
                         "objective_metric": "validation_rmse",
-                        "dataset": "win-quality",
+                        "dataset": "wine-quality",
                         "model_type": "neural_network",
                     }
                 )
+                # Create Optuna study
+                self.study = optuna.create_study(direction='minimize',
+                                                sampler= optuna.samplers.TPESampler(seed= SEED))
                 # Run optimization
-                self.trials = Trials()
-                self.best_params = fmin(
-                    fn = self.objective,
-                    space = search_space,
-                    algo = tpe.suggest,
-                    max_evals = max_evals,
-                    trials= self.trials,
-                    verbose = True,
-                    rstate= np.random.default_rng(SEED)
-                )
+                self.study.optimize(self.objective, n_trials= n_trials)
+                
+                # Get best results
+                self.best_trial = self.study.best_trial
+                self.best_params = self.study.best_params
+                
                 # Log best results
-                best_trial = min(self.trials.results, key = lambda x: x['loss'])
-
                 mlflow.log_params(
                     {
                         'best_learning_rate': self.best_params['learning_rate'],
                         'best_momentum': self.best_params['momentum'],
-                        'best_dropout_rate': self.best_params['dropout_rate']
+                        'best_dropout_rate': self.best_params['dropout_rate'],
+                        'best_batch_size': self.best_params['batch_size'],
+                        'best_hidden_layers': str(self.best_params['hidden_layers'])
                     }
                 )
                 mlflow.log_metrics(
                     {
-                        "best_val_rmse": best_trial['loss'],
-                        "total_trials": len(self.trials.trials)
+                        "best_val_rmse": self.best_trial.value,
+                        "total_trials": len(self.study.trials)
 
                     }
                 )
-                logger.info(f"Optimization completed. Best validation RMSE: {best_trial['loss']:.4f}")
+                logger.info(f"Optimization completed. Best validation RMSE: {self.best_trial.value:.4f}")
+                logger.info(f"Best parameters: {self.best_params}")
+                
                 return {
                     "best_params": self.best_params,
-                    "best_rmse": best_trial["loss"],
-                    "trials": self.trials
+                    "best_rmse": self.best_trial.value,
+                    "study": self.study,
+                    "best_trial": self.best_trial
                 }
+    def get_trials_dataframe(self):
+        """Get all trials as a pandas DataFrame (useful for analysis)"""
+        if self.study:
+            return self.study.trials_dataframe()
+        return None
+        
+    def get_optimization_history(self):
+        """Get optimization history for plotting"""
+        if self.study:
+            return optuna.visualization.plot_optimization_history(self.study)
+        return None
+    
+    def get_parallel_coordinate_plot(self):
+        """Get parallel coordinate plot of all trials"""
+        if self.study:
+            return optuna.visualization.plot_parallel_coordinate(self.study)
+        return None
+        
 
 

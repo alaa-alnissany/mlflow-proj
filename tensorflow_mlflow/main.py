@@ -15,12 +15,13 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore') 
 
 dotenv.load_dotenv()
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+DATA_URL = os.getenv("DATA_URL")
+EXPERIMENT_NAME = os.getenv("EXPERIMENT_NAME")
+NTRIALS = int(os.getenv("NTRIALS"))
 
 def main():
     try:
-        DATA_URL = os.getenv("DATA_URL")
-        EXPERIMENT_NAME = os.getenv("EXPERIMENT_NAME")
-        MAX_EVALS = os.getenv("MAX_EVALS")
         logger.info("Step 1: Preparing data")
         processor = DataProcessor()
         data = processor.load_data(DATA_URL)
@@ -30,7 +31,7 @@ def main():
         # Step 2: Run hyperparameter optimization
         logger.info("Step 2: Starting hyperparameter optimization")
         optimizer = HyperparameterOptimizer(processed_data, EXPERIMENT_NAME)
-        results = optimizer.optimize(max_evals=MAX_EVALS)
+        results = optimizer.optimize(n_trials= NTRIALS)
         
         # Step 3: Final evaluation (optional - train best model on full training data)
         logger.info("Step 3: Optimization completed")
