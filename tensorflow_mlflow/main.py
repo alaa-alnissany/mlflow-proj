@@ -6,6 +6,7 @@ import logging
 import warnings
 import dotenv
 import os
+import mlflow
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore') 
 
 dotenv.load_dotenv()
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 DATA_URL = os.getenv("DATA_URL")
 EXPERIMENT_NAME = os.getenv("EXPERIMENT_NAME")
