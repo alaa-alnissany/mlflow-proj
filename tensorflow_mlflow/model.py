@@ -4,14 +4,13 @@ import logging
 
 # Basic libs
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 
 # Deep Learning Libs
 import tensorflow as tf
 from tensorflow import keras
 
-# Additional Deep Learning Libs 
+# Additional Deep Learning Libs for hyperparameter fine-tuning
 import optuna
 from optuna import Trial
 
@@ -24,7 +23,21 @@ from prepare_data import SEED
 logger = logging.getLogger("__main__")
 tf.random.set_seed(SEED)
 
-class WineQualityModel:
+
+class Model:
+    def __init__(self,input_dim: int):
+        self.input_dim = input_dim
+        self.model = None
+        self.history = None
+    def build(self):
+        pass
+    def train(self):
+        pass
+    def test(self):
+        pass
+
+
+class WineQualityModel(Model):
     """Neural network model for wine quality prediction"""
 
     def __init__(self,input_dim: int):
@@ -32,7 +45,7 @@ class WineQualityModel:
         self.model = None
         self.history = None
     
-    def build_model(self, learning_rate: float, momentum: float, hidden_layers: Tuple[int,...]= (64,32), dropout_rate: float = 0.2)->keras.Model:
+    def build(self, learning_rate: float, momentum: float, hidden_layers: Tuple[int,...]= (64,32), dropout_rate: float = 0.2)->keras.Model:
         """Build and compile the neural network model"""
 
         model = keras.Sequential()
@@ -55,9 +68,9 @@ class WineQualityModel:
             metrics = [keras.metrics.RootMeanSquaredError(), keras.metrics.MeanAbsoluteError()]
         )
         self.model = model
-        return model
+        return model ######## warning
 
-    def train(self,X_tarin: np.ndarray, y_train:np.ndarray,
+    def train(self, X_tarin: np.ndarray, y_train:np.ndarray,
                 X_val: np.ndarray, y_val:np.ndarray,
                 epochs: int = 50, batch_size: int= 32,
                 patience: int = 10) -> Dict[str, Any]:
@@ -68,14 +81,14 @@ class WineQualityModel:
                     verbose= 0
                 )
                 
-        reduce_lr = keras. callbacks.ReduceLROnPlateau(
+        reduce_lr = keras.callbacks.ReduceLROnPlateau(
                     monitor = 'val_loss',
                     factor = 0.5,
                     patience = 5,
                     min_lr = 1e-7,
                     verbose= 0
                 )
-        self.history= self.model.fit(
+        self.history = self.model.fit(
                     X_tarin, y_train,
                     validation_data = (X_val, y_val),
                     epochs= epochs,
@@ -108,7 +121,7 @@ class HyperparameterOptimizer:
     def create_model_and_train(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Create and train model with given hyperparameters"""
         model = WineQualityModel(input_dim= self.data['X_train'].shape[1])
-        model.build_model(
+        model.build(
             learning_rate = params['learning_rate'],
             momentum = params['momentum'],
             hidden_layers = params.get('hidden_layers',(64,32)),

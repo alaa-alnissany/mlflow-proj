@@ -1,5 +1,6 @@
 from prepare_data import DataProcessor
 from model import HyperparameterOptimizer
+import tensorflow as tf
 
 # Important Libs for clean coding
 import logging
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore') 
+tf.get_logger().setLevel("ERROR")
 
 dotenv.load_dotenv()
 mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
