@@ -1,3 +1,4 @@
+from scipy import optimize
 from prepare_data import DataProcessor
 from model import HyperparameterOptimizer
 import tensorflow as tf
@@ -36,7 +37,9 @@ def main():
         logger.info("Step 2: Starting hyperparameter optimization")
         optimizer = HyperparameterOptimizer(processed_data, EXPERIMENT_NAME)
         results = optimizer.optimize(n_trials= NTRIALS)
-        
+        optimizer.get_trials_dataframe()
+        optimizer.get_optimization_history()
+        optimizer.get_parallel_coordinate_plot()
         # Step 3: Final evaluation (optional - train best model on full training data)
         logger.info("Step 3: Optimization completed")
         logger.info(f"Best parameters: {results['best_params']}")

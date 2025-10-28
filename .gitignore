@@ -2,3 +2,4 @@
 /sklearn_mlflow/mlruns/
 /tensorflow_mlflow/mlruns/
 /mlruns/
+/mlartifacts/
