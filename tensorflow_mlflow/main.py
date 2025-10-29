@@ -1,4 +1,3 @@
-from scipy import optimize
 from prepare_data import DataProcessor
 from model import HyperparameterOptimizer
 import tensorflow as tf

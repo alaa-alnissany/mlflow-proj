@@ -45,7 +45,7 @@ class WineQualityModel(Model):
         self.model = None
         self.history = None
     
-    def build(self, learning_rate: float, momentum: float, hidden_layers: Tuple[int,...]= (64,32), dropout_rate: float = 0.2)->keras.Model:
+    def build(self, learning_rate: float, momentum: float, hidden_layers: Tuple[int,...]= (64,32), dropout_rate: float = 0.2):
         """Build and compile the neural network model"""
 
         model = keras.Sequential()
@@ -68,7 +68,6 @@ class WineQualityModel(Model):
             metrics = [keras.metrics.RootMeanSquaredError(), keras.metrics.MeanAbsoluteError()]
         )
         self.model = model
-        return model ######## warning
 
     def train(self, X_tarin: np.ndarray, y_train:np.ndarray,
                 X_val: np.ndarray, y_val:np.ndarray,
@@ -146,8 +145,8 @@ class HyperparameterOptimizer:
             'dropout_rate': trial.suggest_float('dropout_rate', 0.1, 0.5),
             'batch_size': trial.suggest_categorical('batch_size', [32, 64, 128]),
             'hidden_layers': trial.suggest_categorical('hidden_layers', [(64, 32), (128, 64), (64, 32, 16)]),
-            'epochs': 50,  # Fixed value or you can make it tunable
-            'patience': 10  # Fixed value or you can make it tunable
+            'epochs': 50,
+            'patience': 10 
         }
         
         with mlflow.start_run(nested= True):
@@ -204,7 +203,7 @@ class HyperparameterOptimizer:
                 mlflow.log_params(
                     {
                         "optimization_method":"TPE",
-                        "max_evaluations": n_trials,
+                        "number_trials": n_trials,
                         "objective_metric": "validation_rmse",
                         "dataset": "wine-quality",
                         "model_type": "neural_network",
